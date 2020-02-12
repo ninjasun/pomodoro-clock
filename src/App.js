@@ -51,12 +51,14 @@ const _SESSION = "Session";
 const _BREAK = "Break";
 const _MIN = 0; /** 0 min */
 const _MAX = 60; /** 60 min */
-const _1SEC = 1;
+
 /** */
 function isValid(min, max, value){
   if(value === min || value > max) return false;
   return true;
 }
+
+
 
 
 class App extends React.Component {
@@ -67,13 +69,39 @@ class App extends React.Component {
       break: initialConf.break,
       session: initialConf.session,
       timeLeft: initialConf.timeLeft,
-      isRunning: false,
-      rangeActive: _SESSION
+      rangeActive: _SESSION,
+      paused: true,
+      settings: true,
     }
     this.timer = null;
     this.beep = React.createRef();
   }
 
+  componentDidMount(){
+    this.timer = setInterval( this.countDown, 1000 )
+  }
+
+  countDown = () => {
+    const nextTimeLeft = this.state.timeLeft - 1;
+      
+      /** START NEXT POMODORO ***/
+      if (nextTimeLeft < 0 ){
+        console.log("**** START NEXT POMODORO ***** nextTimeLeft: ", nextTimeLeft);
+        //this.endPomodoro();
+        this.beep.current.play();
+        return this.startNextPomodoro();
+      }
+      if (this.state.paused) {
+        return;
+      };
+      /** UPDATE TIME LEFT ***/
+      console.log("**** UPDATE TIME LEFT  nextTimeLeft: ", nextTimeLeft)
+      this.setState({
+        timeLeft: nextTimeLeft,
+        paused: false
+      })
+  }
+ 
 
   /** 
    * newValue is integer  minute
@@ -82,9 +110,11 @@ class App extends React.Component {
     /** check */
     e.preventDefault();
     e.stopPropagation();
-    if (this.state.isRunning) return;
-    if(!isValid(_MIN, _MAX, newValue)) return;
-    let updatedTimeLeft = this.state.timeLeft;
+    const { timeLeft, paused } = this.state;
+
+    if ( !paused ) return;
+    if (!isValid(_MIN, _MAX, newValue)) return;
+    let updatedTimeLeft = timeLeft;
 
     if( this.state.rangeActive === _SESSION && type ===  "session"){
       updatedTimeLeft = newValue * 60;
@@ -117,53 +147,32 @@ class App extends React.Component {
     this.beep.current.play();
   }
 
-  /** start from the value displayed and the range active*/
-  handlePlay = (e) => {
-    if(e){
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    const { isRunning, timeLeft, isPaused } = this.state;
-    const _self = this;
-    if (isRunning && !isPaused) return this.handlePause();
-    //if(this.state.isPaused)
-   
-    this.timer = setInterval( function(){
-     
-        /** START NEXT POMODORO */
-        if (_self.state.timeLeft === 0 ){
-            clearInterval(_self.timer);
-            let nextRange =  _self.nextRange();
-            let nextRangeTime =  _self.nextTimeLeft();
-            _self.playSound();
-            
-            _self.setState({
-              rangeActive: nextRange,
-              timeLeft: nextRangeTime,
-              isRunning: false,
-            }, function(){
-              _self.handlePlay();
-            })
-        }
-
-        let nextTimeLeft = _self.state.timeLeft - 1;
-
-        _self.setState({
-          timeLeft: nextTimeLeft,
-          isRunning: true
-        })
-    }, 1000 )
+  endPomodoro = () => {
+    this.playSound();
+    return;
   }
 
-  handlePause = (e) => {
+  startNextPomodoro = () => {
+      let nextRange =  this.nextRange();
+      let nextRangeTime =  this.nextTimeLeft();
+      console.log("nextRangeTime ", nextRangeTime);
+      console.log("nextRange ", nextRange);       
+      this.setState({
+          rangeActive: nextRange,
+          timeLeft: nextRangeTime,
+      })
+  }
+
+
+  /** start from the value displayed ( timeLeft)*/
+  handlePlayStop = (e) => {
     if(e){
       e.preventDefault();
       e.stopPropagation();
     }
-
     this.setState({
-      isPaused: true
+      paused: !this.state.paused,
+      setting: false
     })
   }
 
@@ -171,17 +180,18 @@ class App extends React.Component {
     e.preventDefault();
     e.stopPropagation();
     /** delete running timer and set to initial params */
-    if(this.state.isRunning){
-      clearInterval(this.timer);
-    }
+  
     this.setState({
       break: initialConf.break,
       session: initialConf.session,
       timeLeft: initialConf.timeLeft,
-      isRunning: false,
-      rangeActive: _SESSION
+      rangeActive: _SESSION,
+      paused: true,
+      setting: true
     })
-    return
+    console.log(" AUDIO TRACK currentTime: ", this.beep.current.currentTime);
+    this.beep.current.load();
+    return;
   }
 
   render(){
@@ -195,10 +205,9 @@ class App extends React.Component {
             <AppControl type="break"   onClick={this.handleSettings} value={this.state.break} />
             <AppControl type="session"  onClick={this.handleSettings} value= {this.state.session} />
           </div>
-          <Display timeLeft={this.state.timeLeft} rangeActive={this.state.rangeActive}/>
+          <Display timeLeft={this.state.timeLeft} rangeActive={this.state.rangeActive} />
           <div className="timerControls">
-          <button onClick={(e)=>{this.handlePlay(e)}} id="start_stop">start</button>
-          <button onClick={(e)=>{this.handlePause(e)}} id="">pause</button>
+          <button onClick={(e)=>{this.handlePlayStop(e)}} id="start_stop">start | stop</button>
           <button onClick={(e)=>{this.handleReset(e)}} id="reset">reset</button>
           </div>
         </div>  
