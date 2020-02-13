@@ -65,6 +65,22 @@ function convertTimeLeft(timeSec){
     }
   }
 
+  function playSound(audioEl){
+    console.log("playSound: ", audioEl);
+    
+    if(audioEl.currentTime === 0){
+      let promise = audioEl.play();
+      if(promise !== undefined) {
+        promise.then( _ => {
+              console.log("Promise PLAY: ",_);
+        })
+        .catch(e => {
+              console.log("Promise Error: ", e)
+          })
+      }
+    }
+   
+  }
 
 
 const initialConf = {
@@ -129,10 +145,10 @@ class App extends React.Component {
     };
     const nextTimeLeft = this.state.timeLeft - 1;
     /** START NEXT TRACK ***/
-    if (nextTimeLeft < 0 ){
+    if (this.state.timeLeft === 0 ){
         console.log("**** START NEXT TRACK ***** nextTimeLeft: ", nextTimeLeft);
-        this.beep.current.play();
-        return this.startNextTrack();
+        playSound(this.beep.current);
+        this.startNextTrack();
     }
     /** UPDATE TIME LEFT ***/
     console.log("**** UPDATE TIME LEFT: ", nextTimeLeft)
@@ -140,6 +156,7 @@ class App extends React.Component {
       timeLeft: nextTimeLeft,
     })
   }
+
 
   /** 
    * newValue is integer  minute,
@@ -215,7 +232,7 @@ class App extends React.Component {
       <div className="App">
         <div className="container">
           <h1 className="title">Pomodoro Clock</h1>
-          <audio id="beep" src="https://goo.gl/65cBl1" preload="auto" ref={this.beep}></audio>
+          <audio id="beep" src="horse.mp3" preload="auto" ref={this.beep}></audio>
           <div className="settingsContainer">
             <AppControl type="break"   onClick={this.handleSettings} value={this.state.break} />
             <AppControl type="session"  onClick={this.handleSettings} value= {this.state.session} />
