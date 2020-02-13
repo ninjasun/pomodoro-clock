@@ -6,6 +6,7 @@ const _BREAK = "Break";
 const _MIN = 0; /** 0 min */
 const _MAX = 60; /** 60 min */
 const UPDATE_EVERY_1_SEC = 1000 /** 1sec */
+const AUDIO_SRC="https://goo.gl/65cBl1"
 
 const AppControl = ({  onClick, type, value}) => {
   return (
@@ -241,7 +242,7 @@ class App extends React.Component {
       <div className="App">
         <div className="container">
           <h1 className="title">Pomodoro Clock</h1>
-          <audio id="beep" src="horse.mp3" preload="auto" ref={this.beep}></audio>
+          <audio id="beep" src={AUDIO_SRC} preload="auto" ref={this.beep}></audio>
           <div className="settingsContainer">
             <AppControl type="break"   onClick={this.handleSettings} value={this.state.break} />
             <AppControl type="session"  onClick={this.handleSettings} value= {this.state.session} />
