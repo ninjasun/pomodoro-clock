@@ -5,7 +5,7 @@ const _SESSION = "Session";
 const _BREAK = "Break";
 const _MIN = 0; /** 0 min */
 const _MAX = 60; /** 60 min */
-const _UPDATE_EVERY_SEC = 1000 /** msec */
+const UPDATE_EVERY_1_SEC = 1000 /** 1sec */
 
 const AppControl = ({  onClick, type, value}) => {
   return (
@@ -24,6 +24,7 @@ const AppControl = ({  onClick, type, value}) => {
  */
 const Display=({timeLeft, trackActive})=>{
   let time = convertTimeLeft(timeLeft);
+
   return(
     <div className="displayTimer">
       <p id="timer-label">{trackActive}</p>
@@ -50,7 +51,6 @@ function convertTimeLeft(timeSec){
    * @param {*} currentTrack:  _SESSION: Session | _BREAK:Break
    */
   const getNextTrack = function getNextTrack({trackActive, breakTime, sessionTime, }){
-    console.log("MOTHER FUCKER: ", arguments)
     if(trackActive === _SESSION){
       return {
         nextTrack: _BREAK,
@@ -66,20 +66,16 @@ function convertTimeLeft(timeSec){
   }
 
   function playSound(audioEl){
-    console.log("playSound: ", audioEl);
-    
-    if(audioEl.currentTime === 0){
       let promise = audioEl.play();
       if(promise !== undefined) {
-        promise.then( _ => {
+        promise
+        .then( _ => {
               console.log("Promise PLAY: ",_);
         })
         .catch(e => {
               console.log("Promise Error: ", e)
           })
       }
-    }
-   
   }
 
 
@@ -129,31 +125,26 @@ class App extends React.Component {
     this.beep = React.createRef();
   }
 
-  componentDidMount(){
-    this.timer = setInterval( this.countDown, _UPDATE_EVERY_SEC );
-    return;
-  }
-
-  componentWillUnmount(){
-    clearInterval(this.timer);
-    return;
-  }
-
+  /**
+   * MAIN FUNCTION: update every sec the timeLeft and switch track
+   */
   countDown = () => {
     if (this.state.paused ) {
       return;
     };
-    const nextTimeLeft = this.state.timeLeft - 1;
+    
+    const { timeLeft } = this.state;
+    console.log("countDown: ", timeLeft)
     /** START NEXT TRACK ***/
-    if (this.state.timeLeft === 0 ){
-        console.log("**** START NEXT TRACK ***** nextTimeLeft: ", nextTimeLeft);
+    if (timeLeft === 0 ){
         playSound(this.beep.current);
+        this.stop();
         this.startNextTrack();
+        return;
     }
     /** UPDATE TIME LEFT ***/
-    console.log("**** UPDATE TIME LEFT: ", nextTimeLeft)
     this.setState({
-      timeLeft: nextTimeLeft,
+      timeLeft: timeLeft - 1,
     })
   }
 
@@ -183,12 +174,22 @@ class App extends React.Component {
   startNextTrack = () => {
       const { trackActive,  session } = this.state;
       const { nextTrack, nextTimeLeft }  = getNextTrack({trackActive, sessionTime: session, breakTime: this.state.break});
-      console.log("nextTrack: ", nextTrack);
-      console.log("nextTimeLeft: ", nextTimeLeft);
+
       this.setState({
           trackActive: nextTrack,
           timeLeft: nextTimeLeft,
-      })
+      }, this.start());
+      return;
+  }
+
+  start=()=>{
+    this.timer = setInterval( this.countDown, UPDATE_EVERY_1_SEC );
+    return;
+  }
+
+  stop=()=>{
+    clearInterval(this.timer);
+    return;
   }
 
   /** start stop timer */
@@ -197,10 +198,18 @@ class App extends React.Component {
       e.preventDefault();
       e.stopPropagation();
     }
+    if(this.state.paused){
+      this.start();
+    }
+    else{
+      this.stop();
+    }
+
     this.setState({
       paused: !this.state.paused,
       settings: false
-    })
+    });
+    return;
   }
 
  /** reset timer. set up standard conf */
@@ -208,7 +217,7 @@ class App extends React.Component {
     e.preventDefault();
     e.stopPropagation();
     /** delete running timer and set to initial params */
-    
+    this.stop();
     this.setState({
       break: initialConf.break,
       session: initialConf.session,
@@ -217,9 +226,9 @@ class App extends React.Component {
       paused: true,
       settings: true
     })
+
     /** SOUND IS ON */
     if(!this.beep.current.paused){
-         console.log("RESET AUDIO: ")
          this.beep.current.pause();
          this.beep.current.currentTime = 0;
     }
