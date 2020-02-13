@@ -1,9 +1,13 @@
 import React from 'react';
 import './App.css';
 
+const _SESSION = "Session";
+const _BREAK = "Break";
+const _MIN = 0; /** 0 min */
+const _MAX = 60; /** 60 min */
+const _UPDATE_EVERY_SEC = 1000 /** msec */
+
 const AppControl = ({  onClick, type, value}) => {
-
-
   return (
     <div className="appSetting" >
       <div id={type+"-label"} className="settingTitle">{type} Length</div>
@@ -15,9 +19,22 @@ const AppControl = ({  onClick, type, value}) => {
   )
 }
 
-function format(val) {
-  if(val > -1 && val < 10) return "0"+val
-  return val+"";
+/**
+ * time  mm:ss format (i.e. 25:00).
+ */
+const Display=({timeLeft, trackActive})=>{
+  let time = convertTimeLeft(timeLeft);
+  return(
+    <div className="displayTimer">
+      <p id="timer-label">{trackActive}</p>
+      <p id="time-left">{time}</p>
+    </div>
+  )
+}
+
+function format(x) {
+  if(x > -1 && x < 10) return "0" + x
+  return x + "";
 }
 
 function convertTimeLeft(timeSec){
@@ -28,18 +45,27 @@ function convertTimeLeft(timeSec){
   return time_string;
 }
 
-/**
- * time  mm:ss format (i.e. 25:00).
- */
-const Display=({timeLeft, rangeActive})=>{
-  let time = convertTimeLeft(timeLeft);
-  return(
-    <div className="displayTimer">
-      <p id="timer-label">{rangeActive}</p>
-      <p id="time-left">{time}</p>
-    </div>
-  )
-}
+  /**
+   * 
+   * @param {*} currentTrack:  _SESSION: Session | _BREAK:Break
+   */
+  const getNextTrack = function getNextTrack({trackActive, breakTime, sessionTime, }){
+    console.log("MOTHER FUCKER: ", arguments)
+    if(trackActive === _SESSION){
+      return {
+        nextTrack: _BREAK,
+        nextTimeLeft: breakTime * 60
+      };
+    }
+    else {
+      return {
+        nextTrack: _SESSION,
+        nextTimeLeft: sessionTime * 60
+      };
+    }
+  }
+
+
 
 const initialConf = {
   break: 5, //min
@@ -47,18 +73,28 @@ const initialConf = {
   timeLeft: 1500 //sec
 }
 
-const _SESSION = "Session";
-const _BREAK = "Break";
-const _MIN = 0; /** 0 min */
-const _MAX = 60; /** 60 min */
 
-/** */
-function isValid(min, max, value){
+/** check ranges */
+function isValid({min, max, value}){
   if(value === min || value > max) return false;
   return true;
 }
 
-
+/**
+ * update break and session length
+ * also update timeLeft if is currently shown
+ */
+function getTimeLeft({timeLeft, trackActive, type, newValue}){
+  if(trackActive === _SESSION && type ===  "session"){
+     return newValue * 60;
+  }
+  else if(trackActive === _BREAK && type === "break") {
+    return newValue * 60;
+  }
+  else {
+    return timeLeft;
+  }
+}
 
 
 class App extends React.Component {
@@ -69,102 +105,76 @@ class App extends React.Component {
       break: initialConf.break,
       session: initialConf.session,
       timeLeft: initialConf.timeLeft,
-      rangeActive: _SESSION,
-      paused: true,
-      settings: true,
+      trackActive: _SESSION,
+      paused: true, 
+      settings: true, //ENABLED
     }
     this.timer = null;
     this.beep = React.createRef();
   }
 
   componentDidMount(){
-    this.timer = setInterval( this.countDown, 1000 )
+    this.timer = setInterval( this.countDown, _UPDATE_EVERY_SEC );
+    return;
+  }
+
+  componentWillUnmount(){
+    clearInterval(this.timer);
+    return;
   }
 
   countDown = () => {
+    if (this.state.paused ) {
+      return;
+    };
     const nextTimeLeft = this.state.timeLeft - 1;
-      
-      /** START NEXT POMODORO ***/
-      if (nextTimeLeft < 0 ){
-        console.log("**** START NEXT POMODORO ***** nextTimeLeft: ", nextTimeLeft);
-        //this.endPomodoro();
+    /** START NEXT TRACK ***/
+    if (nextTimeLeft < 0 ){
+        console.log("**** START NEXT TRACK ***** nextTimeLeft: ", nextTimeLeft);
         this.beep.current.play();
-        return this.startNextPomodoro();
-      }
-      if (this.state.paused) {
-        return;
-      };
-      /** UPDATE TIME LEFT ***/
-      console.log("**** UPDATE TIME LEFT  nextTimeLeft: ", nextTimeLeft)
-      this.setState({
-        timeLeft: nextTimeLeft,
-        paused: false
-      })
+        return this.startNextTrack();
+    }
+    /** UPDATE TIME LEFT ***/
+    console.log("**** UPDATE TIME LEFT: ", nextTimeLeft)
+    this.setState({
+      timeLeft: nextTimeLeft,
+    })
   }
- 
 
   /** 
-   * newValue is integer  minute
+   * newValue is integer  minute,
+   * type is session or break
    */
   handleSettings = (e, type, newValue) => {
     /** check */
     e.preventDefault();
     e.stopPropagation();
-    const { timeLeft, paused } = this.state;
-
-    if ( !paused ) return;
-    if (!isValid(_MIN, _MAX, newValue)) return;
-    let updatedTimeLeft = timeLeft;
-
-    if( this.state.rangeActive === _SESSION && type ===  "session"){
-      updatedTimeLeft = newValue * 60;
-    }
-    if(this.state.rangeActive === _BREAK && type === "break") {
-      updatedTimeLeft = newValue * 60;
-    }
+    const { timeLeft, paused, trackActive, settings } = this.state;
     
-    return this.setState({
+    if ( !settings ) return /** CHECK SETTINGS ENABLED */
+    if ( !paused ) return; /** CHECK PLAY */
+    if ( !isValid({min: _MIN, max: _MAX, value: newValue})) return; /** CHECK RANGE */
+
+    this.setState({
       [type]: newValue,
-      timeLeft: updatedTimeLeft
+      timeLeft: getTimeLeft({timeLeft, trackActive, type, newValue})
     })
-  }
-
-  nextRange=()=>{
-    if( this.state.rangeActive === _SESSION) return _BREAK;
-    if(this.state.rangeActive === _BREAK) return _SESSION;
-  }
-
-/**
- * break, session are minutes
- * @return seconds
- */
-  nextTimeLeft=()=>{
-    if( this.state.rangeActive === _SESSION) return this.state.break * 60 ;
-    if( this.state.rangeActive === _BREAK) return this.state.session * 60 ;
-  }
-
-  playSound=()=>{
-    this.beep.current.play();
-  }
-
-  endPomodoro = () => {
-    this.playSound();
     return;
   }
 
-  startNextPomodoro = () => {
-      let nextRange =  this.nextRange();
-      let nextRangeTime =  this.nextTimeLeft();
-      console.log("nextRangeTime ", nextRangeTime);
-      console.log("nextRange ", nextRange);       
+
+  startNextTrack = () => {
+      const { trackActive,  session } = this.state;
+      const { nextTrack, nextTimeLeft }  = getNextTrack({trackActive, sessionTime: session, breakTime: this.state.break});
+      console.log("nextTrack: ", nextTrack);
+      console.log("nextTimeLeft: ", nextTimeLeft);
       this.setState({
-          rangeActive: nextRange,
-          timeLeft: nextRangeTime,
+          trackActive: nextTrack,
+          timeLeft: nextTimeLeft,
       })
   }
 
-
-  /** start from the value displayed ( timeLeft)*/
+  /** start stop timer */
   handlePlayStop = (e) => {
     if(e){
       e.preventDefault();
@@ -172,25 +182,30 @@ class App extends React.Component {
     }
     this.setState({
       paused: !this.state.paused,
-      setting: false
+      settings: false
     })
   }
 
+ /** reset timer. set up standard conf */
   handleReset = (e) => {
     e.preventDefault();
     e.stopPropagation();
     /** delete running timer and set to initial params */
-  
+    
     this.setState({
       break: initialConf.break,
       session: initialConf.session,
       timeLeft: initialConf.timeLeft,
-      rangeActive: _SESSION,
+      trackActive: _SESSION,
       paused: true,
-      setting: true
+      settings: true
     })
-    console.log(" AUDIO TRACK currentTime: ", this.beep.current.currentTime);
-    this.beep.current.load();
+    /** SOUND IS ON */
+    if(!this.beep.current.paused){
+         console.log("RESET AUDIO: ")
+         this.beep.current.pause();
+         this.beep.current.currentTime = 0;
+    }
     return;
   }
 
@@ -200,14 +215,14 @@ class App extends React.Component {
       <div className="App">
         <div className="container">
           <h1 className="title">Pomodoro Clock</h1>
-          <audio id="beep" src="./horse.mp3" ref={this.beep}></audio>
+          <audio id="beep" src="https://goo.gl/65cBl1" preload="auto" ref={this.beep}></audio>
           <div className="settingsContainer">
             <AppControl type="break"   onClick={this.handleSettings} value={this.state.break} />
             <AppControl type="session"  onClick={this.handleSettings} value= {this.state.session} />
           </div>
-          <Display timeLeft={this.state.timeLeft} rangeActive={this.state.rangeActive} />
+          <Display timeLeft={this.state.timeLeft} trackActive={this.state.trackActive} />
           <div className="timerControls">
-          <button onClick={(e)=>{this.handlePlayStop(e)}} id="start_stop">start | stop</button>
+          <button onClick={(e)=>{this.handlePlayStop(e)}} id="start_stop">start | pause</button>
           <button onClick={(e)=>{this.handleReset(e)}} id="reset">reset</button>
           </div>
         </div>  
