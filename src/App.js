@@ -7,6 +7,7 @@ const _MIN = 0; /** 0 min */
 const _MAX = 60; /** 60 min */
 const UPDATE_EVERY_1_SEC = 1000 /** 1sec */
 const AUDIO_SRC="https://goo.gl/65cBl1"
+const AUDIO_SRC_LOCAL = "horse.mp3";
 
 const AppControl = ({  onClick, type, value}) => {
   return (
@@ -150,6 +151,9 @@ class App extends React.Component {
   }
 
 
+    componentWillUnmount(){
+      clearInterval(this.timer);
+    }
   /** 
    * newValue is integer  minute,
    * type is session or break
